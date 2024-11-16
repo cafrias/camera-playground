@@ -1,47 +1,54 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
+import { useQuery } from '@tanstack/vue-query'
+
+// Following article:
+// https://web.dev/articles/getusermedia-intro#setting_media_constraints_resolution_height_width
+
+const { isPending, isError, data: cameraStream, error, refetch } = useQuery<MediaStream, Error>({
+  queryKey: ['cameraStream'],
+  queryFn: async () => {
+    if (!navigator.mediaDevices) {
+      // TODO: create custom error type
+      throw new Error('No media devices available')
+    }
+
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const camera = devices.find((device) => device.kind === "videoinput")
+    if (!camera) {
+      // TODO: create custom error type
+      throw new Error('No camera')
+    }
+
+    return navigator.mediaDevices.getUserMedia({
+      video: {
+        deviceId: camera.deviceId
+      }
+    })
+  }
+})
+
+function stop() {
+  const {value} = cameraStream;
+  if (!value) {
+    return
+  }
+  value.getVideoTracks().forEach(track => track.stop());
+}
+
+function start() {
+  refetch();
+}
+
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-    </div>
-  </header>
-
   <main>
-    <TheWelcome />
+    <span v-if="isPending">Loading...</span>
+    <span v-else-if="isError">Error: {{ error }}</span>
+    <template v-else>
+      <video autoplay :srcObject="cameraStream"></video>
+      <button @click="stop">Stop</button>
+      <button @click="start">Start</button>
+    </template>
   </main>
 </template>
-
-<style scoped>
-header {
-  line-height: 1.5;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-}
-</style>
